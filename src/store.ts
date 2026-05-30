@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Transaction, BudgetTemplate, MonthlyBudget, MonthlyBudgetItem,
   Member, FamilyMember, SavingsGoal, SavingsTransaction, BufferTransaction, BudgetResolutionAllocation, BudgetOverspendResolution,
   EXPENSE_CATEGORIES
 } from './types';
+import { supabase } from './supabaseClient';
 
 const STORAGE_KEY = 'family-finance-tracker-v10';
 
@@ -47,42 +48,128 @@ function getMonthKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
 
+function normalizeState(parsed: Partial<AppState> | null | undefined): AppState {
+  return {
+    transactions: parsed?.transactions || [],
+    budgetTemplates: parsed?.budgetTemplates || defaultBudgetTemplates,
+    monthlyBudgets: parsed?.monthlyBudgets || [],
+    savingsGoals: parsed?.savingsGoals || defaultSavingsGoals,
+    savingsTransactions: parsed?.savingsTransactions || [],
+    bufferDebt: parsed?.bufferDebt || 0,
+    bufferTransactions: parsed?.bufferTransactions || [],
+    budgetResolutions: parsed?.budgetResolutions || [],
+    members: parsed?.members || defaultMembers,
+  };
+}
+
 function getInitialState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw);
-      return {
-        transactions: parsed.transactions || [],
-        budgetTemplates: parsed.budgetTemplates || defaultBudgetTemplates,
-        monthlyBudgets: parsed.monthlyBudgets || [],
-        savingsGoals: parsed.savingsGoals || defaultSavingsGoals,
-        savingsTransactions: parsed.savingsTransactions || [],
-        bufferDebt: parsed.bufferDebt || 0,
-        bufferTransactions: parsed.bufferTransactions || [],
-        budgetResolutions: parsed.budgetResolutions || [],
-        members: parsed.members || defaultMembers,
-      };
+      return normalizeState(JSON.parse(raw));
     }
   } catch {
     // ignore
   }
-  return {
-    transactions: [],
-    budgetTemplates: defaultBudgetTemplates,
-    monthlyBudgets: [],
-    savingsGoals: defaultSavingsGoals,
-    savingsTransactions: [],
-    bufferDebt: 0,
-    bufferTransactions: [],
-    budgetResolutions: [],
-    members: defaultMembers,
-  };
+
+  return normalizeState(null);
 }
 
 function saveState(state: AppState) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
+
+async function loadCloudState(userId: string, fallbackState: AppState) {
+  const { data, error } = await supabase
+    .from('app_states')
+    .select('id, data')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (data?.id) {
+    return {
+      rowId: data.id as string,
+      state: normalizeState(data.data as Partial<AppState>),
+    };
+  }
+
+  const { data: inserted, error: insertError } = await supabase
+    .from('app_states')
+    .insert({
+      user_id: userId,
+      data: fallbackState,
+      updated_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (insertError) {
+    throw insertError;
+  }
+
+  return {
+    rowId: inserted.id as string,
+    state: fallbackState,
+  };
+}
+
+async function saveCloudState(userId: string, state: AppState, rowId?: string | null) {
+  const payload = {
+    data: state,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (rowId) {
+    const { error } = await supabase
+      .from('app_states')
+      .update(payload)
+      .eq('id', rowId)
+      .eq('user_id', userId);
+
+    if (!error) return;
+    console.error('Не удалось обновить данные Supabase по rowId, пробую по user_id:', error);
+  }
+
+  const { data: existing, error: selectError } = await supabase
+    .from('app_states')
+    .select('id')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (selectError) {
+    throw selectError;
+  }
+
+  if (existing?.id) {
+    const { error: updateError } = await supabase
+      .from('app_states')
+      .update(payload)
+      .eq('id', existing.id)
+      .eq('user_id', userId);
+
+    if (updateError) throw updateError;
+    return;
+  }
+
+  const { error: insertError } = await supabase
+    .from('app_states')
+    .insert({
+      user_id: userId,
+      data: state,
+      updated_at: new Date().toISOString(),
+    });
+
+  if (insertError) throw insertError;
+}
+
 
 function createMonthlyBudget(month: string, templates: BudgetTemplate[]): MonthlyBudget {
   return {
@@ -220,13 +307,49 @@ function ensureDemoData(state: AppState): AppState {
   };
 }
 
-export function useAppStore() {
+export function useAppStore(userId: string | null) {
   const [state, setState] = useState<AppState>(() => ensureDemoData(getInitialState()));
   const [loaded, setLoaded] = useState(false);
+  const [cloudRowId, setCloudRowId] = useState<string | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setLoaded(true);
-  }, []);
+    let cancelled = false;
+
+    async function loadState() {
+      setLoaded(false);
+      setCloudRowId(null);
+
+      const localState = ensureDemoData(getInitialState());
+
+      if (!userId) {
+        setState(localState);
+        setLoaded(true);
+        return;
+      }
+
+      try {
+        const cloud = await loadCloudState(userId, localState);
+        if (cancelled) return;
+        setState(ensureDemoData(cloud.state));
+        setCloudRowId(cloud.rowId);
+      } catch (error) {
+        console.error('Не удалось загрузить данные из Supabase:', error);
+        if (cancelled) return;
+        setState(localState);
+      } finally {
+        if (!cancelled) {
+          setLoaded(true);
+        }
+      }
+    }
+
+    loadState();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   useEffect(() => {
     if (loaded) {
@@ -243,10 +366,30 @@ export function useAppStore() {
   }, [loaded]);
 
   useEffect(() => {
-    if (loaded) {
-      saveState(state);
+    if (!loaded) return;
+
+    saveState(state);
+
+    if (!userId) return;
+
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
     }
-  }, [state, loaded]);
+
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        await saveCloudState(userId, state, cloudRowId);
+      } catch (error) {
+        console.error('Не удалось сохранить данные в Supabase:', error);
+      }
+    }, 500);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+      }
+    };
+  }, [state, loaded, userId, cloudRowId]);
 
   // Transactions
   const addTransaction = useCallback((tx: Omit<Transaction, 'id'>) => {

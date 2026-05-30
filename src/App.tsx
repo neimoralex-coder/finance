@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from './store';
 import BottomNav, { type Tab } from './components/BottomNav';
@@ -11,19 +11,52 @@ import Buffer from './components/Buffer';
 import AddTransactionModal from './components/AddTransactionModal';
 import Header from './components/Header';
 import { getCurrentMonthYear } from './lib/utils';
+import { supabase } from './supabaseClient';
+import AuthScreen from './components/AuthScreen';
+import type { Session } from '@supabase/supabase-js';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [showAddTx, setShowAddTx] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoaded, setAuthLoaded] = useState(false);
 
-  const store = useAppStore();
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthLoaded(true);
+    });
 
-  if (!store.loaded) {
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthLoaded(true);
+    });
+
+    return () => {
+      listener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeTab]);
+
+  const store = useAppStore(session?.user.id ?? null);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  if (!authLoaded || (session && !store.loaded)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-900 rounded-full animate-spin" />
       </div>
     );
+  }
+
+  if (!session) {
+    return <AuthScreen />;
   }
 
   return (
@@ -37,6 +70,7 @@ export default function App() {
           onTabChange={setActiveTab}
           onAdd={() => setShowAddTx(true)}
           onReset={store.resetData}
+          onSignOut={handleSignOut}
         />
 
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-6">

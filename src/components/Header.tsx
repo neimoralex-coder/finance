@@ -1,4 +1,4 @@
-import { Wallet, Settings, Trash2, X, Plus } from 'lucide-react';
+import { Wallet, Settings, Trash2, X, Plus, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { navTabs, type Tab } from './BottomNav';
@@ -9,9 +9,10 @@ interface HeaderProps {
   onTabChange: (tab: Tab) => void;
   onAdd: () => void;
   onReset: () => void;
+  onSignOut: () => void;
 }
 
-export default function Header({ currentMonth, activeTab, onTabChange, onAdd, onReset }: HeaderProps) {
+export default function Header({ currentMonth, activeTab, onTabChange, onAdd, onReset, onSignOut }: HeaderProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
@@ -73,6 +74,14 @@ export default function Header({ currentMonth, activeTab, onTabChange, onAdd, on
                   <div className="p-4">
                     <h3 className="text-sm font-semibold text-slate-900 mb-3">Настройки</h3>
                     {!confirmReset ? (
+                      <>
+                        <button
+                      onClick={onSignOut}
+                      className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                        >
+                          <LogOut className="w-4 h-4" />
+                          Выйти из аккаунта
+                        </button>
                       <button
                         onClick={() => setConfirmReset(true)}
                         className="flex items-center gap-2 w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -80,6 +89,7 @@ export default function Header({ currentMonth, activeTab, onTabChange, onAdd, on
                         <Trash2 className="w-4 h-4" />
                         Сбросить все данные
                       </button>
+                      </>
                     ) : (
                       <div className="space-y-2">
                         <p className="text-xs text-slate-600">Уверены? Все транзакции и бюджеты будут удалены.</p>
