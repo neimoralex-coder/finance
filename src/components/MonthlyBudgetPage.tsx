@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Trash2, Edit2, Check, X, Lock, AlertTriangle, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, Lock, AlertTriangle, ChevronDown, ChevronUp, ShieldAlert, Unlock } from 'lucide-react';
 import { AppState } from '../store';
 import { BudgetTemplate, BudgetResolutionAllocation, MonthlyBudget } from '../types';
 import { formatCurrency } from '../lib/utils';
@@ -11,6 +11,7 @@ interface Props {
   onUpdateTemplate: (id: string, updates: Partial<BudgetTemplate>) => void;
   onDeleteTemplate: (id: string) => void;
   onCloseMonth: (month: string) => void;
+  onReopenMonth: (month: string) => void;
   onResolveOverspend: (month: string, targetTemplateId: string, allocations: BudgetResolutionAllocation[]) => void;
 }
 
@@ -26,7 +27,7 @@ type RichBudgetItem = {
   over: boolean;
 };
 
-export default function MonthlyBudgetPage({ state, onAddTemplate, onUpdateTemplate, onDeleteTemplate, onCloseMonth, onResolveOverspend }: Props) {
+export default function MonthlyBudgetPage({ state, onAddTemplate, onUpdateTemplate, onDeleteTemplate, onCloseMonth, onReopenMonth, onResolveOverspend }: Props) {
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
   const [newLimit, setNewLimit] = useState('');
@@ -64,6 +65,23 @@ export default function MonthlyBudgetPage({ state, onAddTemplate, onUpdateTempla
   const totalUsed = currentItems.reduce((s, it) => s + it.used, 0);
   const totalPercent = totalLimit > 0 ? (totalUsed / totalLimit) * 100 : 0;
   const isOverTotal = totalUsed > totalLimit;
+
+  const hasFinancialActivityAfterMonth = (month: string) => {
+    return (
+      state.transactions.some((t) => t.date.slice(0, 7) > month) ||
+      state.savingsTransactions.some((t) => t.date.slice(0, 7) > month) ||
+      state.budgetResolutions.some((r) => r.month > month)
+    );
+  };
+
+  const handleReopenMonth = (month: string) => {
+    const confirmed = window.confirm(
+      `Переоткрыть ${monthLabel(month)}?\n\nМесяц снова станет активным, отчёт закрытия и компенсации перерасхода за этот месяц будут отменены. Если следующий месяц был создан автоматически и в нём нет операций, он удалится.`
+    );
+    if (!confirmed) return;
+    onReopenMonth(month);
+    setExpandedMonth(null);
+  };
 
   const totalIncome = state.transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const totalExpense = state.transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -474,7 +492,7 @@ export default function MonthlyBudgetPage({ state, onAddTemplate, onUpdateTempla
                   <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center"><Lock className="w-4 h-4 text-slate-500" /></div><div className="text-left"><p className="text-sm font-semibold text-slate-900">{monthLabel(mb.month)}</p><p className="text-xs text-slate-500">{formatCurrency(mbTotalUsed)} из {formatCurrency(mbTotalLimit)}</p></div></div>
                   {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
                 </button>
-                <AnimatePresence>{isExpanded && <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden"><div className="px-5 pb-4 space-y-4"><MonthReportCard month={mb.month} mb={mb} />{rich.map((item) => <div key={item.templateId} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0"><div className="flex-1"><p className="text-sm text-slate-700">{item.name}</p><div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1 w-32"><div className={`h-full rounded-full ${item.percent > 100 ? 'bg-red-400' : 'bg-blue-400'}`} style={{ width: `${Math.min(item.percent, 100)}%` }} /></div></div><div className="text-right"><p className="text-sm font-medium text-slate-900">{formatCurrency(item.used)}</p><p className="text-xs text-slate-400">из {formatCurrency(item.limit)}</p></div></div>)}</div></motion.div>}</AnimatePresence>
+                <AnimatePresence>{isExpanded && <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden"><div className="px-5 pb-4 space-y-4"><MonthReportCard month={mb.month} mb={mb} />{(() => { const canReopen = !hasFinancialActivityAfterMonth(mb.month); return <div className={`rounded-2xl border p-4 ${canReopen ? 'bg-blue-50 border-blue-100' : 'bg-slate-50 border-slate-100'}`}><div className="flex items-start gap-3"><div className={`w-9 h-9 rounded-xl flex items-center justify-center ${canReopen ? 'bg-blue-100' : 'bg-slate-100'}`}><Unlock className={`w-4 h-4 ${canReopen ? 'text-blue-600' : 'text-slate-400'}`} /></div><div className="flex-1"><p className="text-sm font-semibold text-slate-900">Переоткрыть месяц</p><p className="text-xs text-slate-500 mt-1">Если месяц закрыли случайно, его можно вернуть в работу. Автоматически созданный следующий месяц удалится, если в нём ещё нет операций.</p>{!canReopen && <p className="text-xs text-amber-600 mt-2">Переоткрытие заблокировано: после этого месяца уже есть операции или корректировки. Сначала уберите их, чтобы не сломать историю бюджета.</p>}</div></div><button disabled={!canReopen} onClick={() => handleReopenMonth(mb.month)} className={`mt-3 w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${canReopen ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>Переоткрыть {monthLabel(mb.month)}</button></div>; })()}{rich.map((item) => <div key={item.templateId} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0"><div className="flex-1"><p className="text-sm text-slate-700">{item.name}</p><div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mt-1 w-32"><div className={`h-full rounded-full ${item.percent > 100 ? 'bg-red-400' : 'bg-blue-400'}`} style={{ width: `${Math.min(item.percent, 100)}%` }} /></div></div><div className="text-right"><p className="text-sm font-medium text-slate-900">{formatCurrency(item.used)}</p><p className="text-xs text-slate-400">из {formatCurrency(item.limit)}</p></div></div>)}</div></motion.div>}</AnimatePresence>
               </motion.div>
             );
           })}

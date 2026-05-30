@@ -385,6 +385,95 @@ export function useAppStore() {
     });
   }, []);
 
+  // Reopen month after accidental closing.
+  // Safe rule: allow reopening only if there are no financial operations after this month.
+  // If the next month was created automatically and is still empty, remove it.
+  const reopenMonth = useCallback((month: string) => {
+    setState((prev) => {
+      const targetBudget = prev.monthlyBudgets.find((m) => m.month === month);
+      if (!targetBudget || targetBudget.status !== 'closed') return prev;
+
+      const hasLaterTransactions = prev.transactions.some((t) => t.date.slice(0, 7) > month);
+      const hasLaterSavings = prev.savingsTransactions.some((t) => t.date.slice(0, 7) > month);
+      const hasLaterResolutions = prev.budgetResolutions.some((r) => r.month > month);
+      if (hasLaterTransactions || hasLaterSavings || hasLaterResolutions) return prev;
+
+      const y = parseInt(month.slice(0, 4));
+      const m = parseInt(month.slice(5, 7));
+      const nextMonth = getMonthKey(new Date(y, m, 1));
+
+      const resolutionsToUndo = prev.budgetResolutions.filter((r) => r.month === month);
+      const bufferDebtToRemove = resolutionsToUndo.reduce(
+        (sum, r) => sum + r.allocations.filter((a) => a.type === 'buffer').reduce((s, a) => s + a.amount, 0),
+        0
+      );
+
+      const nextMonthLimitRestores = new Map<string, number>();
+      resolutionsToUndo.forEach((resolution) => {
+        const amount = resolution.allocations
+          .filter((a) => a.type === 'next-month')
+          .reduce((sum, a) => sum + a.amount, 0);
+        if (amount > 0) {
+          nextMonthLimitRestores.set(
+            resolution.targetTemplateId,
+            (nextMonthLimitRestores.get(resolution.targetTemplateId) || 0) + amount
+          );
+        }
+      });
+
+      const nextBudget = prev.monthlyBudgets.find((b) => b.month === nextMonth);
+      const nextBudgetHasManualData = !!nextBudget && (
+        nextBudget.items.some((item) => (item.spent || 0) > 0 || (item.correctionSpent || 0) > 0) ||
+        prev.transactions.some((t) => t.date.slice(0, 7) === nextMonth) ||
+        prev.savingsTransactions.some((t) => t.date.slice(0, 7) === nextMonth) ||
+        prev.budgetResolutions.some((r) => r.month === nextMonth)
+      );
+
+      let newBudgets = prev.monthlyBudgets.map((budget) => {
+        if (budget.month === month) {
+          return {
+            ...budget,
+            status: 'open' as const,
+            closedAt: undefined,
+            items: budget.items.map((item) => ({
+              ...item,
+              correctionSpent: undefined,
+            })),
+          };
+        }
+
+        if (budget.month === nextMonth && nextMonthLimitRestores.size > 0) {
+          return {
+            ...budget,
+            items: budget.items.map((item) => {
+              const restoreAmount = nextMonthLimitRestores.get(item.templateId) || 0;
+              if (restoreAmount <= 0 || item.limitOverride === undefined) return item;
+              const templateLimit = prev.budgetTemplates.find((t) => t.id === item.templateId)?.limit;
+              const restoredLimit = item.limitOverride + restoreAmount;
+              return {
+                ...item,
+                limitOverride: templateLimit !== undefined && restoredLimit >= templateLimit ? undefined : restoredLimit,
+              };
+            }),
+          };
+        }
+
+        return budget;
+      });
+
+      if (nextBudget && !nextBudgetHasManualData) {
+        newBudgets = newBudgets.filter((budget) => budget.month !== nextMonth);
+      }
+
+      return {
+        ...prev,
+        monthlyBudgets: newBudgets,
+        bufferDebt: Math.max(0, prev.bufferDebt - bufferDebtToRemove),
+        budgetResolutions: prev.budgetResolutions.filter((r) => r.month !== month),
+      };
+    });
+  }, []);
+
   // Savings
   const addSavingsTransaction = useCallback((tx: Omit<SavingsTransaction, 'id'>) => {
     setState((prev) => {
@@ -556,6 +645,7 @@ export function useAppStore() {
     updateBudgetTemplate,
     deleteBudgetTemplate,
     closeMonth,
+    reopenMonth,
     addSavingsTransaction,
     deleteSavingsTransaction,
     updateSavingsGoal,

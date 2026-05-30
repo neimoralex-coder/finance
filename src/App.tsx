@@ -66,6 +66,7 @@ export default function App() {
                   onUpdateTemplate={store.updateBudgetTemplate}
                   onDeleteTemplate={store.deleteBudgetTemplate}
                   onCloseMonth={store.closeMonth}
+                  onReopenMonth={store.reopenMonth}
                   onResolveOverspend={store.resolveOverspend}
                 />
               )}
