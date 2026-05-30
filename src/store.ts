@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
   Transaction, BudgetTemplate, MonthlyBudget, MonthlyBudgetItem,
-  Member, FamilyMember, SavingsGoal, SavingsTransaction,
+  Member, FamilyMember, SavingsGoal, SavingsTransaction, BufferTransaction, BudgetResolutionAllocation, BudgetOverspendResolution,
   EXPENSE_CATEGORIES
 } from './types';
 
@@ -13,6 +13,9 @@ export interface AppState {
   monthlyBudgets: MonthlyBudget[];
   savingsGoals: SavingsGoal[];
   savingsTransactions: SavingsTransaction[];
+  bufferDebt: number;
+  bufferTransactions: BufferTransaction[];
+  budgetResolutions: BudgetOverspendResolution[];
   members: FamilyMember[];
 }
 
@@ -55,6 +58,9 @@ function getInitialState(): AppState {
         monthlyBudgets: parsed.monthlyBudgets || [],
         savingsGoals: parsed.savingsGoals || defaultSavingsGoals,
         savingsTransactions: parsed.savingsTransactions || [],
+        bufferDebt: parsed.bufferDebt || 0,
+        bufferTransactions: parsed.bufferTransactions || [],
+        budgetResolutions: parsed.budgetResolutions || [],
         members: parsed.members || defaultMembers,
       };
     }
@@ -67,6 +73,9 @@ function getInitialState(): AppState {
     monthlyBudgets: [],
     savingsGoals: defaultSavingsGoals,
     savingsTransactions: [],
+    bufferDebt: 0,
+    bufferTransactions: [],
+    budgetResolutions: [],
     members: defaultMembers,
   };
 }
@@ -205,6 +214,9 @@ function ensureDemoData(state: AppState): AppState {
     monthlyBudgets: [prevMB, currentMB],
     savingsGoals: defaultSavingsGoals,
     savingsTransactions: demoSavingsTx,
+    bufferDebt: state.bufferDebt || 0,
+    bufferTransactions: state.bufferTransactions || [],
+    budgetResolutions: state.budgetResolutions || [],
   };
 }
 
@@ -435,6 +447,90 @@ export function useAppStore() {
     }));
   }, []);
 
+
+  const resolveOverspend = useCallback((month: string, targetTemplateId: string, allocations: BudgetResolutionAllocation[]) => {
+    setState((prev) => {
+      const budget = prev.monthlyBudgets.find((mb) => mb.month === month);
+      const targetTemplate = prev.budgetTemplates.find((t) => t.id === targetTemplateId);
+      if (!budget || !targetTemplate) return prev;
+
+      const resolution: BudgetOverspendResolution = {
+        id: generateId(),
+        month,
+        targetTemplateId,
+        targetName: targetTemplate.name,
+        overspentAmount: allocations.reduce((sum, a) => sum + a.amount, 0),
+        allocations,
+        createdAt: new Date().toISOString(),
+      };
+
+      let newBudgetDebt = prev.bufferDebt;
+      const categoryAllocations = allocations.filter((a) => a.type === 'category' && a.sourceTemplateId);
+      const bufferAmount = allocations
+        .filter((a) => a.type === 'buffer')
+        .reduce((sum, a) => sum + a.amount, 0);
+      const nextMonthAmount = allocations
+        .filter((a) => a.type === 'next-month')
+        .reduce((sum, a) => sum + a.amount, 0);
+
+      newBudgetDebt += bufferAmount;
+
+      let newBudgets = prev.monthlyBudgets.map((mb) => {
+        if (mb.month !== month) return mb;
+        return {
+          ...mb,
+          items: mb.items.map((item) => {
+            const allocation = categoryAllocations
+              .filter((a) => a.sourceTemplateId === item.templateId)
+              .reduce((sum, a) => sum + a.amount, 0);
+            return allocation > 0
+              ? { ...item, correctionSpent: (item.correctionSpent || 0) + allocation }
+              : item;
+          }),
+        };
+      });
+
+      if (nextMonthAmount > 0) {
+        const y = parseInt(month.slice(0, 4));
+        const m = parseInt(month.slice(5, 7));
+        const nextMonth = getMonthKey(new Date(y, m, 1));
+        const hasNext = newBudgets.some((b) => b.month === nextMonth);
+        if (!hasNext) {
+          newBudgets = [...newBudgets, createMonthlyBudget(nextMonth, prev.budgetTemplates)];
+        }
+        newBudgets = newBudgets.map((mb) => {
+          if (mb.month !== nextMonth) return mb;
+          return {
+            ...mb,
+            items: mb.items.map((item) => {
+              if (item.templateId !== targetTemplateId) return item;
+              const currentLimit = item.limitOverride ?? targetTemplate.limit;
+              return { ...item, limitOverride: Math.max(0, currentLimit - nextMonthAmount) };
+            }),
+          };
+        });
+      }
+
+      return {
+        ...prev,
+        monthlyBudgets: newBudgets,
+        bufferDebt: newBudgetDebt,
+        budgetResolutions: [resolution, ...prev.budgetResolutions],
+      };
+    });
+  }, []);
+
+  const addBufferTransaction = useCallback((tx: Omit<BufferTransaction, 'id'>) => {
+    setState((prev) => {
+      const amount = Math.max(0, tx.amount);
+      return {
+        ...prev,
+        bufferDebt: Math.max(0, prev.bufferDebt - amount),
+        bufferTransactions: [{ ...tx, id: generateId(), amount }, ...prev.bufferTransactions],
+      };
+    });
+  }, []);
+
   const resetData = useCallback(() => {
     const currentMonth = getMonthKey(new Date());
     setState({
@@ -443,6 +539,9 @@ export function useAppStore() {
       monthlyBudgets: [createMonthlyBudget(currentMonth, [])],
       savingsGoals: [],
       savingsTransactions: [],
+      bufferDebt: 0,
+      bufferTransactions: [],
+      budgetResolutions: [],
       members: defaultMembers,
     });
   }, []);
@@ -463,6 +562,8 @@ export function useAppStore() {
     addSavingsGoal,
     deleteSavingsGoal,
     updateMember,
+    resolveOverspend,
+    addBufferTransaction,
     resetData,
   };
 }

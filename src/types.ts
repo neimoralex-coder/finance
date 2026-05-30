@@ -22,6 +22,27 @@ export interface BudgetTemplate {
 export interface MonthlyBudgetItem {
   templateId: string;
   spent: number;
+  /** Сколько лимита забрали у этой категории для компенсации чужого перерасхода */
+  correctionSpent?: number;
+  /** Индивидуальный лимит месяца. Используется, если перерасход перенесли в следующий месяц */
+  limitOverride?: number;
+}
+
+export interface BudgetResolutionAllocation {
+  type: 'category' | 'buffer' | 'next-month';
+  sourceTemplateId?: string;
+  sourceName: string;
+  amount: number;
+}
+
+export interface BudgetOverspendResolution {
+  id: string;
+  month: string;
+  targetTemplateId: string;
+  targetName: string;
+  overspentAmount: number;
+  allocations: BudgetResolutionAllocation[];
+  createdAt: string;
 }
 
 export interface MonthlyBudget {
@@ -47,6 +68,13 @@ export interface SavingsTransaction {
   date: string;
   note: string;
   member: Member;
+}
+
+export interface BufferTransaction {
+  id: string;
+  amount: number;
+  date: string;
+  note: string;
 }
 
 export interface FamilyMember {

@@ -66,6 +66,7 @@ export default function App() {
                   onUpdateTemplate={store.updateBudgetTemplate}
                   onDeleteTemplate={store.deleteBudgetTemplate}
                   onCloseMonth={store.closeMonth}
+                  onResolveOverspend={store.resolveOverspend}
                 />
               )}
               {activeTab === 'savings' && (
@@ -78,7 +79,7 @@ export default function App() {
                   onDeleteGoal={store.deleteSavingsGoal}
                 />
               )}
-              {activeTab === 'buffer' && <Buffer state={store.state} />}
+              {activeTab === 'buffer' && <Buffer state={store.state} onAddBufferTransaction={store.addBufferTransaction} />}
               {activeTab === 'analytics' && <Analytics state={store.state} />}
             </motion.div>
           </AnimatePresence>
