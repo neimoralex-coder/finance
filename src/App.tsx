@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAppStore } from './store';
-import BottomNav from './components/BottomNav';
+import BottomNav, { type Tab } from './components/BottomNav';
 import Dashboard from './components/Dashboard';
 import Transactions from './components/Transactions';
 import MonthlyBudgetPage from './components/MonthlyBudgetPage';
@@ -11,8 +11,6 @@ import Buffer from './components/Buffer';
 import AddTransactionModal from './components/AddTransactionModal';
 import Header from './components/Header';
 import { getCurrentMonthYear } from './lib/utils';
-
-type Tab = 'dashboard' | 'transactions' | 'budgets' | 'analytics' | 'savings' | 'buffer' | 'monthlyBudget';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
@@ -33,9 +31,15 @@ export default function App() {
       <BottomNav active={activeTab} onChange={setActiveTab} onAdd={() => setShowAddTx(true)} />
 
       <div className="flex-1 flex flex-col min-w-0">
-        <Header currentMonth={getCurrentMonthYear()} onReset={store.resetData} />
+        <Header
+          currentMonth={getCurrentMonthYear()}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          onAdd={() => setShowAddTx(true)}
+          onReset={store.resetData}
+        />
 
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-6">
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-6">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}

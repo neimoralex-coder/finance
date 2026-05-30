@@ -1,6 +1,6 @@
-import { LayoutDashboard, List, Target, BarChart3, Plus, PiggyBank, Wallet, Calendar } from 'lucide-react';
+import { LayoutDashboard, List, BarChart3, Plus, PiggyBank, Wallet, Calendar } from 'lucide-react';
 
-type Tab = 'dashboard' | 'transactions' | 'budgets' | 'analytics' | 'savings' | 'buffer' | 'monthlyBudget';
+export type Tab = 'dashboard' | 'transactions' | 'budgets' | 'analytics' | 'savings' | 'buffer' | 'monthlyBudget';
 
 interface Props {
   active: Tab;
@@ -8,7 +8,7 @@ interface Props {
   onAdd: () => void;
 }
 
-const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+export const navTabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Главная', icon: <LayoutDashboard className="w-5 h-5" /> },
   { id: 'transactions', label: 'Транзакции', icon: <List className="w-5 h-5" /> },
   { id: 'monthlyBudget', label: 'Бюджет', icon: <Calendar className="w-5 h-5" /> },
@@ -42,7 +42,7 @@ export default function BottomNav({ active, onChange, onAdd }: Props) {
           </button>
 
           <nav className="space-y-1">
-            {tabs.map((tab) => (
+            {navTabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => onChange(tab.id)}
@@ -59,33 +59,6 @@ export default function BottomNav({ active, onChange, onAdd }: Props) {
           </nav>
         </div>
       </aside>
-
-      {/* Mobile bottom nav */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-40 pb-safe">
-        <div className="flex items-center justify-around px-1 py-2">
-          {tabs.slice(0, 5).map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onChange(tab.id)}
-              className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all ${
-                active === tab.id ? 'text-slate-900' : 'text-slate-400'
-              }`}
-            >
-              {tab.icon}
-              <span className="text-[10px] font-medium">{tab.label}</span>
-            </button>
-          ))}
-          <button
-            onClick={onAdd}
-            className="flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl text-emerald-600"
-          >
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-              <Plus className="w-4 h-4" />
-            </div>
-            <span className="text-[10px] font-medium">Добавить</span>
-          </button>
-        </div>
-      </nav>
     </>
   );
 }
