@@ -21,8 +21,8 @@ export default function Dashboard({ state, onAddClick, onSavingsClick, onBudgetC
   const monthKey = new Date().toISOString().slice(0, 7);
 
   const monthlyTransactions = useMemo(() => {
-    return state.transactions.filter((t) => t.date >= monthStart && t.date <= monthEnd);
-  }, [state.transactions, monthStart, monthEnd]);
+  return state.transactions.filter((t) => t.date.startsWith(monthKey));
+}, [state.transactions, monthKey]);
 
   const income = useMemo(
     () => monthlyTransactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0),

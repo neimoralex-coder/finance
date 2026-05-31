@@ -37,29 +37,28 @@ export default function Analytics({ state }: Props) {
       .map(([name, value]) => ({ name, value, color: getCategoryColor(name, 'expense') }))
       .sort((a, b) => b.value - a.value);
   }, [state.transactions]);
+  
+// Member data
+const memberData = useMemo(() => {
+  const currentMonth = new Date().toISOString().slice(0, 7);
 
-  // Member data
-  const memberData = useMemo(() => {
-    return state.members.map((m) => {
-      const now = new Date();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  return state.members.map((m) => {
+    const income = state.transactions
+      .filter((t) => t.member === m.id && t.type === 'income' && t.date.startsWith(currentMonth))
+      .reduce((s, t) => s + t.amount, 0);
 
-      const income = state.transactions
-        .filter((t) => t.member === m.id && t.type === 'income' && t.date >= monthStart && t.date <= monthEnd)
-        .reduce((s, t) => s + t.amount, 0);
-      const expense = state.transactions
-        .filter((t) => t.member === m.id && t.type === 'expense' && t.date >= monthStart && t.date <= monthEnd)
-        .reduce((s, t) => s + t.amount, 0);
+    const expense = state.transactions
+      .filter((t) => t.member === m.id && t.type === 'expense' && t.date.startsWith(currentMonth))
+      .reduce((s, t) => s + t.amount, 0);
 
-      return {
-        name: m.name,
-        Доход: income,
-        Расход: expense,
-        color: m.color,
-      };
-    });
-  }, [state.members, state.transactions]);
+    return {
+      name: m.name,
+      Доход: income,
+      Расход: expense,
+      color: m.color,
+    };
+  });
+}, [state.members, state.transactions]);
 
   // Trend data (last N months)
   const trendData = useMemo(() => {

@@ -4,13 +4,15 @@ import { Plus, Pencil, Trash2, Save, X } from 'lucide-react';
 type Member = {
   id: string;
   name: string;
+  color: string;
+  avatar: string;
 };
 
 type Props = {
   members: Member[];
   transactions: any[];
   savingsTransactions?: any[];
-  addMember: (name: string) => void;
+  addMember: (member: { name: string; color: string; avatar: string }) => void;
   updateMember: (memberId: string, name: string) => void;
   deleteMember: (memberId: string, reassignToMemberId?: string) => void;
 };
@@ -26,12 +28,32 @@ export default function Participants({
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const MEMBER_COLORS = [
+  '#3b82f6',
+  '#ec4899',
+  '#10b981',
+  '#f59e0b',
+  '#8b5cf6',
+  '#ef4444',
+  '#06b6d4',
+  '#64748b',
+];
+
+const [newColor, setNewColor] = useState(MEMBER_COLORS[0]);
 
   const handleAdd = () => {
-    if (!newName.trim()) return;
-    addMember(newName);
-    setNewName('');
-  };
+  const cleanName = newName.trim();
+  if (!cleanName) return;
+
+  addMember({
+    name: cleanName,
+    color: newColor,
+    avatar: cleanName.charAt(0).toUpperCase() || '?',
+  });
+
+  setNewName('');
+  setNewColor(MEMBER_COLORS[0]);
+};
 
   const startEdit = (member: Member) => {
     setEditingId(member.id);
@@ -118,6 +140,31 @@ export default function Participants({
             Добавить
           </button>
         </div>
+        <div className="flex gap-2 flex-wrap">
+
+  {MEMBER_COLORS.map((color) => (
+
+    <button
+
+      key={color}
+
+      type="button"
+
+      onClick={() => setNewColor(color)}
+
+      className={`w-8 h-8 rounded-full border-2 ${
+
+        newColor === color ? 'border-slate-900' : 'border-transparent'
+
+      }`}
+
+      style={{ backgroundColor: color }}
+
+    />
+
+  ))}
+
+</div>
       </div>
 
       <div className="bg-card rounded-2xl p-4 border space-y-3">

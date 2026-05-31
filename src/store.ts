@@ -833,13 +833,15 @@ export function useAppStore(userId: string | null = null) {
     }));
   }, []);
 
-  const addMember = useCallback((name: string) => {
+  const addMember = useCallback((member: Omit<FamilyMember, 'id'>) => {
   setState((prev) => {
+    const cleanName = member.name.trim();
+
     const newMember: FamilyMember = {
       id: generateId() as Member,
-      name,
-      color: '#64748b',
-      avatar: name.trim().charAt(0).toUpperCase() || '?',
+      name: cleanName || 'Участник',
+      color: member.color,
+      avatar: member.avatar || cleanName.charAt(0).toUpperCase() || '?',
     };
 
     return {
@@ -850,22 +852,40 @@ export function useAppStore(userId: string | null = null) {
 }, []);
 
   const updateMember = useCallback((id: Member, updates: Partial<FamilyMember>) => {
-    setState((prev) => ({
-      ...prev,
-      members: prev.members.map((m) =>
-        m.id === id ? { ...m, ...updates } : m
-      ),
-    }));
-  }, []);
+  setState((prev) => ({
+    ...prev,
+    members: prev.members.map((m) => {
+      if (m.id !== id) return m;
 
-  const deleteMember = useCallback((id: Member) => {
-    setState((prev) => ({
-      ...prev,
-      members: prev.members.filter((m) => m.id !== id),
-      transactions: prev.transactions.filter((t) => t.member !== id),
-      savingsTransactions: prev.savingsTransactions.filter((t) => t.member !== id),
-    }));
-  }, []);
+      const nextName = updates.name ?? m.name;
+
+      return {
+        ...m,
+        ...updates,
+        avatar: nextName.trim().charAt(0).toUpperCase() || '?',
+      };
+    }),
+  }));
+}, []);
+
+  const deleteMember = useCallback((id: Member, reassignToMemberId?: Member) => {
+  setState((prev) => ({
+    ...prev,
+    members: prev.members.filter((m) => m.id !== id),
+
+    transactions: reassignToMemberId
+      ? prev.transactions.map((t) =>
+          t.member === id ? { ...t, member: reassignToMemberId } : t
+        )
+      : prev.transactions.filter((t) => t.member !== id),
+
+    savingsTransactions: reassignToMemberId
+      ? prev.savingsTransactions.map((t) =>
+          t.member === id ? { ...t, member: reassignToMemberId } : t
+        )
+      : prev.savingsTransactions.filter((t) => t.member !== id),
+  }));
+}, []);
 
   const resolveOverspend = useCallback(
     (month: string, targetTemplateId: string, allocations: BudgetResolutionAllocation[]) => {

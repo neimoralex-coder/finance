@@ -20,7 +20,7 @@ export default function App() {
   window.scrollTo(0, 0);
 }, [activeTab]);
 
-  const store = useAppStore(null);
+  const store = useAppStore('main-user');
 
   if (!store.loaded) {
     return (
@@ -98,9 +98,11 @@ export default function App() {
     savingsTransactions={store.state.savingsTransactions}
     addMember={store.addMember}
     updateMember={(memberId, name) =>
-  store.updateMember(memberId as any, { name })
+  store.updateMember(memberId, { name })
 }
-    deleteMember={(memberId) => store.deleteMember(memberId as any)}
+    deleteMember={(memberId, reassignToMemberId) =>
+  store.deleteMember(memberId, reassignToMemberId)
+}
   />
 )}
             </motion.div>
