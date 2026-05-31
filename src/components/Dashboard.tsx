@@ -183,7 +183,7 @@ export default function Dashboard({ state, onAddClick, onSavingsClick, onBudgetC
           className="space-y-6"
         >
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">По членам семьи</h3>
+            <h3 className="text-sm font-semibold text-slate-900 mb-4">По участникам</h3>
             <div className="space-y-4">
               {memberStats.map((m) => (
                 <div key={m.id} className="flex items-center gap-3">

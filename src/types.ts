@@ -1,5 +1,5 @@
 export type TransactionType = 'income' | 'expense';
-export type Member = 'person1' | 'person2';
+export type Member = string;
 
 export interface Transaction {
   id: string;

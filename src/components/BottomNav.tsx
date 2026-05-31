@@ -1,12 +1,13 @@
-import { LayoutDashboard, List, BarChart3, Plus, PiggyBank, Wallet, Calendar } from 'lucide-react';
+import { LayoutDashboard, List, BarChart3, Plus, PiggyBank, Wallet, Calendar, Users } from 'lucide-react';
 
-export type Tab = 'dashboard' | 'transactions' | 'budgets' | 'analytics' | 'savings' | 'buffer' | 'monthlyBudget';
+export type Tab = 'dashboard' | 'transactions' | 'budgets' | 'analytics' | 'savings' | 'participants' | 'buffer' | 'monthlyBudget';
 
 interface Props {
   active: Tab;
   onChange: (tab: Tab) => void;
   onAdd: () => void;
 }
+
 
 export const navTabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: 'Главная', icon: <LayoutDashboard className="w-5 h-5" /> },
@@ -15,6 +16,7 @@ export const navTabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'savings', label: 'Сбережения', icon: <PiggyBank className="w-5 h-5" /> },
   { id: 'buffer', label: 'Буфер', icon: <Wallet className="w-5 h-5" /> },
   { id: 'analytics', label: 'Аналитика', icon: <BarChart3 className="w-5 h-5" /> },
+  { id: 'participants', label: 'Участники', icon: <Users className="w-5 h-5" /> },
 ];
 
 export default function BottomNav({ active, onChange, onAdd }: Props) {

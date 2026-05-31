@@ -100,7 +100,7 @@ export default function Transactions({ state, onDelete, onUpdate }: Props) {
             onChange={(e) => setMemberFilter(e.target.value as Member | 'all')}
             className="px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 focus:border-blue-500 outline-none bg-white"
           >
-            <option value="all">Все члены</option>
+            <option value="all">Все участники</option>
             {state.members.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}

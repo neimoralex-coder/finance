@@ -120,7 +120,7 @@ export default function Analytics({ state }: Props) {
 
   const tabs: { id: ChartTab; label: string; icon: React.ReactNode }[] = [
     { id: 'categories', label: 'Категории', icon: <PieChartIcon className="w-4 h-4" /> },
-    { id: 'members', label: 'По членам', icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'members', label: 'По участникам', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'trend', label: 'Динамика', icon: <TrendingUp className="w-4 h-4" /> },
     { id: 'compare', label: 'Сравнение', icon: <Calendar className="w-4 h-4" /> },
   ];
@@ -232,7 +232,7 @@ export default function Analytics({ state }: Props) {
 
         {activeTab === 'members' && (
           <div>
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Сравнение доходов и расходов по членам семьи</h3>
+            <h3 className="text-sm font-semibold text-slate-900 mb-4">Сравнение доходов и расходов по участникам</h3>
             <div className="h-80">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={memberData} barGap={8}>

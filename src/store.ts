@@ -1,8 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Transaction, BudgetTemplate, MonthlyBudget, MonthlyBudgetItem,
-  Member, FamilyMember, SavingsGoal, SavingsTransaction, BufferTransaction, BudgetResolutionAllocation, BudgetOverspendResolution,
-  EXPENSE_CATEGORIES
+  Transaction,
+  BudgetTemplate,
+  MonthlyBudget,
+  Member,
+  FamilyMember,
+  SavingsGoal,
+  SavingsTransaction,
+  BufferTransaction,
+  BudgetResolutionAllocation,
+  BudgetOverspendResolution,
 } from './types';
 import { supabase } from './supabaseClient';
 
@@ -21,8 +28,8 @@ export interface AppState {
 }
 
 const defaultMembers: FamilyMember[] = [
-  { id: 'person1', name: 'Артем', color: '#3b82f6', avatar: 'А' },
-  { id: 'person2', name: 'Елена', color: '#ec4899', avatar: 'Е' },
+  { id: 'person1' as Member, name: 'Артем', color: '#3b82f6', avatar: 'А' },
+  { id: 'person2' as Member, name: 'Елена', color: '#ec4899', avatar: 'Е' },
 ];
 
 const defaultBudgetTemplates: BudgetTemplate[] = [
@@ -133,6 +140,7 @@ async function saveCloudState(userId: string, state: AppState, rowId?: string | 
       .eq('user_id', userId);
 
     if (!error) return;
+
     console.error('Не удалось обновить данные Supabase по rowId, пробую по user_id:', error);
   }
 
@@ -169,7 +177,6 @@ async function saveCloudState(userId: string, state: AppState, rowId?: string | 
 
   if (insertError) throw insertError;
 }
-
 
 function createMonthlyBudget(month: string, templates: BudgetTemplate[]): MonthlyBudget {
   return {
@@ -220,6 +227,7 @@ function ensureDemoData(state: AppState): AppState {
 
   for (let i = 0; i < incomes.length; i++) {
     const t = incomes[i];
+
     demoTransactions.push({
       id: generateId(),
       amount: t.amount,
@@ -233,6 +241,7 @@ function ensureDemoData(state: AppState): AppState {
 
   for (let i = 0; i < expensesCurrent.length; i++) {
     const t = expensesCurrent[i];
+
     demoTransactions.push({
       id: generateId(),
       amount: t.amount,
@@ -253,12 +262,13 @@ function ensureDemoData(state: AppState): AppState {
       category: 'Зарплата',
       description: 'Зарплата',
       date: new Date(now.getFullYear(), now.getMonth() - 1, 5 + i).toISOString().split('T')[0],
-      member: i % 2 === 0 ? 'person1' : 'person2',
+      member: i % 2 === 0 ? ('person1' as Member) : ('person2' as Member),
     });
   }
 
   for (let i = 0; i < expensesPrev.length; i++) {
     const t = expensesPrev[i];
+
     demoTransactions.push({
       id: generateId(),
       amount: t.amount,
@@ -278,6 +288,7 @@ function ensureDemoData(state: AppState): AppState {
     if (tx.type === 'expense' && tx.budgetTemplateId) {
       const txMonth = tx.date.slice(0, 7);
       const mb = txMonth === currentMonth ? currentMB : txMonth === prevMonth ? prevMB : null;
+
       if (mb) {
         const item = mb.items.find((it) => it.templateId === tx.budgetTemplateId);
         if (item) item.spent += tx.amount;
@@ -289,9 +300,30 @@ function ensureDemoData(state: AppState): AppState {
   prevMB.closedAt = new Date().toISOString();
 
   const demoSavingsTx: SavingsTransaction[] = [
-    { id: generateId(), goalId: 'safety-net', amount: 15000, date: new Date(now.getFullYear(), now.getMonth(), 10).toISOString().split('T')[0], note: 'Ежемесячное отложение', member: 'person1' },
-    { id: generateId(), goalId: 'safety-net', amount: 5000, date: new Date(now.getFullYear(), now.getMonth(), 12).toISOString().split('T')[0], note: 'Дополнительно', member: 'person2' },
-    { id: generateId(), goalId: 'investments', amount: 3000, date: new Date(now.getFullYear(), now.getMonth(), 15).toISOString().split('T')[0], note: 'В акции', member: 'person2' },
+    {
+      id: generateId(),
+      goalId: 'safety-net',
+      amount: 15000,
+      date: new Date(now.getFullYear(), now.getMonth(), 10).toISOString().split('T')[0],
+      note: 'Ежемесячное отложение',
+      member: 'person1' as Member,
+    },
+    {
+      id: generateId(),
+      goalId: 'safety-net',
+      amount: 5000,
+      date: new Date(now.getFullYear(), now.getMonth(), 12).toISOString().split('T')[0],
+      note: 'Дополнительно',
+      member: 'person2' as Member,
+    },
+    {
+      id: generateId(),
+      goalId: 'investments',
+      amount: 3000,
+      date: new Date(now.getFullYear(), now.getMonth(), 15).toISOString().split('T')[0],
+      note: 'В акции',
+      member: 'person2' as Member,
+    },
   ];
 
   return {
@@ -304,10 +336,11 @@ function ensureDemoData(state: AppState): AppState {
     bufferDebt: state.bufferDebt || 0,
     bufferTransactions: state.bufferTransactions || [],
     budgetResolutions: state.budgetResolutions || [],
+    members: state.members || defaultMembers,
   };
 }
 
-export function useAppStore(userId: string | null) {
+export function useAppStore(userId: string | null = null) {
   const [state, setState] = useState<AppState>(() => ensureDemoData(getInitialState()));
   const [loaded, setLoaded] = useState(false);
   const [cloudRowId, setCloudRowId] = useState<string | null>(null);
@@ -330,12 +363,16 @@ export function useAppStore(userId: string | null) {
 
       try {
         const cloud = await loadCloudState(userId, localState);
+
         if (cancelled) return;
+
         setState(ensureDemoData(cloud.state));
         setCloudRowId(cloud.rowId);
       } catch (error) {
         console.error('Не удалось загрузить данные из Supabase:', error);
+
         if (cancelled) return;
+
         setState(localState);
       } finally {
         if (!cancelled) {
@@ -352,17 +389,20 @@ export function useAppStore(userId: string | null) {
   }, [userId]);
 
   useEffect(() => {
-    if (loaded) {
-      const currentMonth = getMonthKey(new Date());
-      setState((prev) => {
-        const hasBudget = prev.monthlyBudgets.some((mb) => mb.month === currentMonth);
-        if (hasBudget) return prev;
-        return {
-          ...prev,
-          monthlyBudgets: [...prev.monthlyBudgets, createMonthlyBudget(currentMonth, prev.budgetTemplates)],
-        };
-      });
-    }
+    if (!loaded) return;
+
+    const currentMonth = getMonthKey(new Date());
+
+    setState((prev) => {
+      const hasBudget = prev.monthlyBudgets.some((mb) => mb.month === currentMonth);
+
+      if (hasBudget) return prev;
+
+      return {
+        ...prev,
+        monthlyBudgets: [...prev.monthlyBudgets, createMonthlyBudget(currentMonth, prev.budgetTemplates)],
+      };
+    });
   }, [loaded]);
 
   useEffect(() => {
@@ -391,13 +431,14 @@ export function useAppStore(userId: string | null) {
     };
   }, [state, loaded, userId, cloudRowId]);
 
-  // Transactions
   const addTransaction = useCallback((tx: Omit<Transaction, 'id'>) => {
     setState((prev) => {
       const newTx = { ...tx, id: generateId() };
       const newTransactions = [newTx, ...prev.transactions];
+
       if (tx.type === 'expense' && tx.budgetTemplateId) {
         const txMonth = tx.date.slice(0, 7);
+
         const newBudgets = prev.monthlyBudgets.map((mb) => {
           if (mb.month === txMonth && mb.status === 'open') {
             return {
@@ -409,21 +450,35 @@ export function useAppStore(userId: string | null) {
               ),
             };
           }
+
           return mb;
         });
-        return { ...prev, transactions: newTransactions, monthlyBudgets: newBudgets };
+
+        return {
+          ...prev,
+          transactions: newTransactions,
+          monthlyBudgets: newBudgets,
+        };
       }
-      return { ...prev, transactions: newTransactions };
+
+      return {
+        ...prev,
+        transactions: newTransactions,
+      };
     });
   }, []);
 
   const deleteTransaction = useCallback((id: string) => {
     setState((prev) => {
       const tx = prev.transactions.find((t) => t.id === id);
+
       if (!tx) return prev;
+
       const newTransactions = prev.transactions.filter((t) => t.id !== id);
+
       if (tx.type === 'expense' && tx.budgetTemplateId) {
         const txMonth = tx.date.slice(0, 7);
+
         const newBudgets = prev.monthlyBudgets.map((mb) => {
           if (mb.month === txMonth) {
             return {
@@ -435,62 +490,116 @@ export function useAppStore(userId: string | null) {
               ),
             };
           }
+
           return mb;
         });
-        return { ...prev, transactions: newTransactions, monthlyBudgets: newBudgets };
+
+        return {
+          ...prev,
+          transactions: newTransactions,
+          monthlyBudgets: newBudgets,
+        };
       }
-      return { ...prev, transactions: newTransactions };
+
+      return {
+        ...prev,
+        transactions: newTransactions,
+      };
     });
   }, []);
 
   const updateTransaction = useCallback((id: string, txUpdates: Partial<Transaction>) => {
     setState((prev) => {
       const oldTx = prev.transactions.find((t) => t.id === id);
+
       if (!oldTx) return prev;
-      const newTransactions = prev.transactions.map((t) => (t.id === id ? { ...t, ...txUpdates } : t));
+
+      const newTransactions = prev.transactions.map((t) =>
+        t.id === id ? { ...t, ...txUpdates } : t
+      );
+
       if (
         oldTx.type === 'expense' &&
-        (txUpdates.amount !== undefined || txUpdates.budgetTemplateId !== undefined || txUpdates.date !== undefined)
+        (
+          txUpdates.amount !== undefined ||
+          txUpdates.budgetTemplateId !== undefined ||
+          txUpdates.date !== undefined
+        )
       ) {
         const newBudgets = prev.monthlyBudgets.map((mb) => ({
           ...mb,
           items: mb.items.map((item) => {
             const spent = newTransactions
-              .filter((t) => t.type === 'expense' && t.budgetTemplateId === item.templateId && t.date.slice(0, 7) === mb.month)
+              .filter(
+                (t) =>
+                  t.type === 'expense' &&
+                  t.budgetTemplateId === item.templateId &&
+                  t.date.slice(0, 7) === mb.month
+              )
               .reduce((s, t) => s + t.amount, 0);
-            return { ...item, spent };
+
+            return {
+              ...item,
+              spent,
+            };
           }),
         }));
-        return { ...prev, transactions: newTransactions, monthlyBudgets: newBudgets };
+
+        return {
+          ...prev,
+          transactions: newTransactions,
+          monthlyBudgets: newBudgets,
+        };
       }
-      return { ...prev, transactions: newTransactions };
+
+      return {
+        ...prev,
+        transactions: newTransactions,
+      };
     });
   }, []);
 
-  // Budget templates
   const addBudgetTemplate = useCallback((template: Omit<BudgetTemplate, 'id'>) => {
     setState((prev) => {
-      const newTemplate = { ...template, id: generateId() };
+      const newTemplate = {
+        ...template,
+        id: generateId(),
+      };
+
       const hasOpen = prev.monthlyBudgets.some((mb) => mb.status === 'open');
+
       let newBudgets = prev.monthlyBudgets;
+
       if (!hasOpen) {
         const currentMonth = getMonthKey(new Date());
         newBudgets = [...newBudgets, createMonthlyBudget(currentMonth, prev.budgetTemplates)];
       }
+
       newBudgets = newBudgets.map((mb) => {
         if (mb.status === 'open' && !mb.items.find((it) => it.templateId === newTemplate.id)) {
-          return { ...mb, items: [...mb.items, { templateId: newTemplate.id, spent: 0 }] };
+          return {
+            ...mb,
+            items: [...mb.items, { templateId: newTemplate.id, spent: 0 }],
+          };
         }
+
         return mb;
       });
-      return { ...prev, budgetTemplates: [...prev.budgetTemplates, newTemplate], monthlyBudgets: newBudgets };
+
+      return {
+        ...prev,
+        budgetTemplates: [...prev.budgetTemplates, newTemplate],
+        monthlyBudgets: newBudgets,
+      };
     });
   }, []);
 
   const updateBudgetTemplate = useCallback((id: string, updates: Partial<BudgetTemplate>) => {
     setState((prev) => ({
       ...prev,
-      budgetTemplates: prev.budgetTemplates.map((t) => (t.id === id ? { ...t, ...updates } : t)),
+      budgetTemplates: prev.budgetTemplates.map((t) =>
+        t.id === id ? { ...t, ...updates } : t
+      ),
     }));
   }, []);
 
@@ -505,14 +614,20 @@ export function useAppStore(userId: string | null) {
     }));
   }, []);
 
-  // Close month
   const closeMonth = useCallback((month: string) => {
     setState((prev) => {
       const mb = prev.monthlyBudgets.find((m) => m.month === month);
+
       if (!mb || mb.status !== 'open') return prev;
 
       const newBudgets = prev.monthlyBudgets.map((m) =>
-        m.month === month ? { ...m, status: 'closed' as const, closedAt: new Date().toISOString() } : m
+        m.month === month
+          ? {
+              ...m,
+              status: 'closed' as const,
+              closedAt: new Date().toISOString(),
+            }
+          : m
       );
 
       const y = parseInt(month.slice(0, 4));
@@ -520,42 +635,54 @@ export function useAppStore(userId: string | null) {
       const nextDate = new Date(y, m, 1);
       const nextMonth = getMonthKey(nextDate);
       const hasNext = newBudgets.some((b) => b.month === nextMonth);
+
       const finalBudgets = hasNext
         ? newBudgets
         : [...newBudgets, createMonthlyBudget(nextMonth, prev.budgetTemplates)];
 
-      return { ...prev, monthlyBudgets: finalBudgets };
+      return {
+        ...prev,
+        monthlyBudgets: finalBudgets,
+      };
     });
   }, []);
 
-  // Reopen month after accidental closing.
-  // Safe rule: allow reopening only if there are no financial operations after this month.
-  // If the next month was created automatically and is still empty, remove it.
   const reopenMonth = useCallback((month: string) => {
     setState((prev) => {
       const targetBudget = prev.monthlyBudgets.find((m) => m.month === month);
+
       if (!targetBudget || targetBudget.status !== 'closed') return prev;
 
       const hasLaterTransactions = prev.transactions.some((t) => t.date.slice(0, 7) > month);
       const hasLaterSavings = prev.savingsTransactions.some((t) => t.date.slice(0, 7) > month);
       const hasLaterResolutions = prev.budgetResolutions.some((r) => r.month > month);
-      if (hasLaterTransactions || hasLaterSavings || hasLaterResolutions) return prev;
+
+      if (hasLaterTransactions || hasLaterSavings || hasLaterResolutions) {
+        return prev;
+      }
 
       const y = parseInt(month.slice(0, 4));
       const m = parseInt(month.slice(5, 7));
       const nextMonth = getMonthKey(new Date(y, m, 1));
 
       const resolutionsToUndo = prev.budgetResolutions.filter((r) => r.month === month);
+
       const bufferDebtToRemove = resolutionsToUndo.reduce(
-        (sum, r) => sum + r.allocations.filter((a) => a.type === 'buffer').reduce((s, a) => s + a.amount, 0),
+        (sum, r) =>
+          sum +
+          r.allocations
+            .filter((a) => a.type === 'buffer')
+            .reduce((s, a) => s + a.amount, 0),
         0
       );
 
       const nextMonthLimitRestores = new Map<string, number>();
+
       resolutionsToUndo.forEach((resolution) => {
         const amount = resolution.allocations
           .filter((a) => a.type === 'next-month')
           .reduce((sum, a) => sum + a.amount, 0);
+
         if (amount > 0) {
           nextMonthLimitRestores.set(
             resolution.targetTemplateId,
@@ -565,12 +692,15 @@ export function useAppStore(userId: string | null) {
       });
 
       const nextBudget = prev.monthlyBudgets.find((b) => b.month === nextMonth);
-      const nextBudgetHasManualData = !!nextBudget && (
-        nextBudget.items.some((item) => (item.spent || 0) > 0 || (item.correctionSpent || 0) > 0) ||
-        prev.transactions.some((t) => t.date.slice(0, 7) === nextMonth) ||
-        prev.savingsTransactions.some((t) => t.date.slice(0, 7) === nextMonth) ||
-        prev.budgetResolutions.some((r) => r.month === nextMonth)
-      );
+
+      const nextBudgetHasManualData =
+        !!nextBudget &&
+        (
+          nextBudget.items.some((item) => (item.spent || 0) > 0 || (item.correctionSpent || 0) > 0) ||
+          prev.transactions.some((t) => t.date.slice(0, 7) === nextMonth) ||
+          prev.savingsTransactions.some((t) => t.date.slice(0, 7) === nextMonth) ||
+          prev.budgetResolutions.some((r) => r.month === nextMonth)
+        );
 
       let newBudgets = prev.monthlyBudgets.map((budget) => {
         if (budget.month === month) {
@@ -590,12 +720,20 @@ export function useAppStore(userId: string | null) {
             ...budget,
             items: budget.items.map((item) => {
               const restoreAmount = nextMonthLimitRestores.get(item.templateId) || 0;
-              if (restoreAmount <= 0 || item.limitOverride === undefined) return item;
+
+              if (restoreAmount <= 0 || item.limitOverride === undefined) {
+                return item;
+              }
+
               const templateLimit = prev.budgetTemplates.find((t) => t.id === item.templateId)?.limit;
               const restoredLimit = item.limitOverride + restoreAmount;
+
               return {
                 ...item,
-                limitOverride: templateLimit !== undefined && restoredLimit >= templateLimit ? undefined : restoredLimit,
+                limitOverride:
+                  templateLimit !== undefined && restoredLimit >= templateLimit
+                    ? undefined
+                    : restoredLimit,
               };
             }),
           };
@@ -617,13 +755,22 @@ export function useAppStore(userId: string | null) {
     });
   }, []);
 
-  // Savings
   const addSavingsTransaction = useCallback((tx: Omit<SavingsTransaction, 'id'>) => {
     setState((prev) => {
-      const newTx = { ...tx, id: generateId() };
+      const newTx = {
+        ...tx,
+        id: generateId(),
+      };
+
       const updatedGoals = prev.savingsGoals.map((g) =>
-        g.id === tx.goalId ? { ...g, current: g.current + tx.amount } : g
+        g.id === tx.goalId
+          ? {
+              ...g,
+              current: g.current + tx.amount,
+            }
+          : g
       );
+
       return {
         ...prev,
         savingsTransactions: [newTx, ...prev.savingsTransactions],
@@ -635,10 +782,18 @@ export function useAppStore(userId: string | null) {
   const deleteSavingsTransaction = useCallback((id: string) => {
     setState((prev) => {
       const tx = prev.savingsTransactions.find((t) => t.id === id);
+
       if (!tx) return prev;
+
       const updatedGoals = prev.savingsGoals.map((g) =>
-        g.id === tx.goalId ? { ...g, current: Math.max(0, g.current - tx.amount) } : g
+        g.id === tx.goalId
+          ? {
+              ...g,
+              current: Math.max(0, g.current - tx.amount),
+            }
+          : g
       );
+
       return {
         ...prev,
         savingsTransactions: prev.savingsTransactions.filter((t) => t.id !== id),
@@ -650,13 +805,19 @@ export function useAppStore(userId: string | null) {
   const updateSavingsGoal = useCallback((id: string, updates: Partial<SavingsGoal>) => {
     setState((prev) => ({
       ...prev,
-      savingsGoals: prev.savingsGoals.map((g) => (g.id === id ? { ...g, ...updates } : g)),
+      savingsGoals: prev.savingsGoals.map((g) =>
+        g.id === id ? { ...g, ...updates } : g
+      ),
     }));
   }, []);
 
   const addSavingsGoal = useCallback((goal: Omit<SavingsGoal, 'id'>) => {
     setState((prev) => {
-      const newGoal = { ...goal, id: generateId() };
+      const newGoal = {
+        ...goal,
+        id: generateId(),
+      };
+
       return {
         ...prev,
         savingsGoals: [...prev.savingsGoals, newGoal],
@@ -672,99 +833,156 @@ export function useAppStore(userId: string | null) {
     }));
   }, []);
 
+  const addMember = useCallback((name: string) => {
+  setState((prev) => {
+    const newMember: FamilyMember = {
+      id: generateId() as Member,
+      name,
+      color: '#64748b',
+      avatar: name.trim().charAt(0).toUpperCase() || '?',
+    };
+
+    return {
+      ...prev,
+      members: [...prev.members, newMember],
+    };
+  });
+}, []);
+
   const updateMember = useCallback((id: Member, updates: Partial<FamilyMember>) => {
     setState((prev) => ({
       ...prev,
-      members: prev.members.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+      members: prev.members.map((m) =>
+        m.id === id ? { ...m, ...updates } : m
+      ),
     }));
   }, []);
 
+  const deleteMember = useCallback((id: Member) => {
+    setState((prev) => ({
+      ...prev,
+      members: prev.members.filter((m) => m.id !== id),
+      transactions: prev.transactions.filter((t) => t.member !== id),
+      savingsTransactions: prev.savingsTransactions.filter((t) => t.member !== id),
+    }));
+  }, []);
 
-  const resolveOverspend = useCallback((month: string, targetTemplateId: string, allocations: BudgetResolutionAllocation[]) => {
-    setState((prev) => {
-      const budget = prev.monthlyBudgets.find((mb) => mb.month === month);
-      const targetTemplate = prev.budgetTemplates.find((t) => t.id === targetTemplateId);
-      if (!budget || !targetTemplate) return prev;
+  const resolveOverspend = useCallback(
+    (month: string, targetTemplateId: string, allocations: BudgetResolutionAllocation[]) => {
+      setState((prev) => {
+        const budget = prev.monthlyBudgets.find((mb) => mb.month === month);
+        const targetTemplate = prev.budgetTemplates.find((t) => t.id === targetTemplateId);
 
-      const resolution: BudgetOverspendResolution = {
-        id: generateId(),
-        month,
-        targetTemplateId,
-        targetName: targetTemplate.name,
-        overspentAmount: allocations.reduce((sum, a) => sum + a.amount, 0),
-        allocations,
-        createdAt: new Date().toISOString(),
-      };
+        if (!budget || !targetTemplate) return prev;
 
-      let newBudgetDebt = prev.bufferDebt;
-      const categoryAllocations = allocations.filter((a) => a.type === 'category' && a.sourceTemplateId);
-      const bufferAmount = allocations
-        .filter((a) => a.type === 'buffer')
-        .reduce((sum, a) => sum + a.amount, 0);
-      const nextMonthAmount = allocations
-        .filter((a) => a.type === 'next-month')
-        .reduce((sum, a) => sum + a.amount, 0);
-
-      newBudgetDebt += bufferAmount;
-
-      let newBudgets = prev.monthlyBudgets.map((mb) => {
-        if (mb.month !== month) return mb;
-        return {
-          ...mb,
-          items: mb.items.map((item) => {
-            const allocation = categoryAllocations
-              .filter((a) => a.sourceTemplateId === item.templateId)
-              .reduce((sum, a) => sum + a.amount, 0);
-            return allocation > 0
-              ? { ...item, correctionSpent: (item.correctionSpent || 0) + allocation }
-              : item;
-          }),
+        const resolution: BudgetOverspendResolution = {
+          id: generateId(),
+          month,
+          targetTemplateId,
+          targetName: targetTemplate.name,
+          overspentAmount: allocations.reduce((sum, a) => sum + a.amount, 0),
+          allocations,
+          createdAt: new Date().toISOString(),
         };
-      });
 
-      if (nextMonthAmount > 0) {
-        const y = parseInt(month.slice(0, 4));
-        const m = parseInt(month.slice(5, 7));
-        const nextMonth = getMonthKey(new Date(y, m, 1));
-        const hasNext = newBudgets.some((b) => b.month === nextMonth);
-        if (!hasNext) {
-          newBudgets = [...newBudgets, createMonthlyBudget(nextMonth, prev.budgetTemplates)];
-        }
-        newBudgets = newBudgets.map((mb) => {
-          if (mb.month !== nextMonth) return mb;
+        let newBudgetDebt = prev.bufferDebt;
+
+        const categoryAllocations = allocations.filter(
+          (a) => a.type === 'category' && a.sourceTemplateId
+        );
+
+        const bufferAmount = allocations
+          .filter((a) => a.type === 'buffer')
+          .reduce((sum, a) => sum + a.amount, 0);
+
+        const nextMonthAmount = allocations
+          .filter((a) => a.type === 'next-month')
+          .reduce((sum, a) => sum + a.amount, 0);
+
+        newBudgetDebt += bufferAmount;
+
+        let newBudgets = prev.monthlyBudgets.map((mb) => {
+          if (mb.month !== month) return mb;
+
           return {
             ...mb,
             items: mb.items.map((item) => {
-              if (item.templateId !== targetTemplateId) return item;
-              const currentLimit = item.limitOverride ?? targetTemplate.limit;
-              return { ...item, limitOverride: Math.max(0, currentLimit - nextMonthAmount) };
+              const allocation = categoryAllocations
+                .filter((a) => a.sourceTemplateId === item.templateId)
+                .reduce((sum, a) => sum + a.amount, 0);
+
+              return allocation > 0
+                ? {
+                    ...item,
+                    correctionSpent: (item.correctionSpent || 0) + allocation,
+                  }
+                : item;
             }),
           };
         });
-      }
 
-      return {
-        ...prev,
-        monthlyBudgets: newBudgets,
-        bufferDebt: newBudgetDebt,
-        budgetResolutions: [resolution, ...prev.budgetResolutions],
-      };
-    });
-  }, []);
+        if (nextMonthAmount > 0) {
+          const y = parseInt(month.slice(0, 4));
+          const m = parseInt(month.slice(5, 7));
+          const nextMonth = getMonthKey(new Date(y, m, 1));
+          const hasNext = newBudgets.some((b) => b.month === nextMonth);
+
+          if (!hasNext) {
+            newBudgets = [...newBudgets, createMonthlyBudget(nextMonth, prev.budgetTemplates)];
+          }
+
+          newBudgets = newBudgets.map((mb) => {
+            if (mb.month !== nextMonth) return mb;
+
+            return {
+              ...mb,
+              items: mb.items.map((item) => {
+                if (item.templateId !== targetTemplateId) return item;
+
+                const currentLimit = item.limitOverride ?? targetTemplate.limit;
+
+                return {
+                  ...item,
+                  limitOverride: Math.max(0, currentLimit - nextMonthAmount),
+                };
+              }),
+            };
+          });
+        }
+
+        return {
+          ...prev,
+          monthlyBudgets: newBudgets,
+          bufferDebt: newBudgetDebt,
+          budgetResolutions: [resolution, ...prev.budgetResolutions],
+        };
+      });
+    },
+    []
+  );
 
   const addBufferTransaction = useCallback((tx: Omit<BufferTransaction, 'id'>) => {
     setState((prev) => {
       const amount = Math.max(0, tx.amount);
+
       return {
         ...prev,
         bufferDebt: Math.max(0, prev.bufferDebt - amount),
-        bufferTransactions: [{ ...tx, id: generateId(), amount }, ...prev.bufferTransactions],
+        bufferTransactions: [
+          {
+            ...tx,
+            id: generateId(),
+            amount,
+          },
+          ...prev.bufferTransactions,
+        ],
       };
     });
   }, []);
 
   const resetData = useCallback(() => {
     const currentMonth = getMonthKey(new Date());
+
     setState({
       transactions: [],
       budgetTemplates: [],
@@ -794,7 +1012,9 @@ export function useAppStore(userId: string | null) {
     updateSavingsGoal,
     addSavingsGoal,
     deleteSavingsGoal,
+    addMember,
     updateMember,
+    deleteMember,
     resolveOverspend,
     addBufferTransaction,
     resetData,
